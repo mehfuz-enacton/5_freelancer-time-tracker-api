@@ -1,4 +1,6 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
+
+mongoose.pluralize(null);
 
 const connection = async (): Promise<void> => {
   try {
