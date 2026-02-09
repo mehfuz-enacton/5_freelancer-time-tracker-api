@@ -1,4 +1,4 @@
-import USER, { IUser } from "../models/user";
+import { IUser } from "../models/user";
 import jwt, { JwtPayload } from "jsonwebtoken";
 import { Request, Response, NextFunction } from "express";
 
@@ -23,10 +23,10 @@ export const protect = async (req: Request, res: Response, next: NextFunction) =
 
         const decodedToken = jwt.verify(token, process.env.JWT_SECRET as string) as JwtPayload;
 
-        const user = await USER.findById(decodedToken.id);
-        if(!user) return res.status(401).json({ msg: "The user belonging to this token does not exist" });
+        // const user = await USER.findById(decodedToken.id);
+        // if(!user) return res.status(401).json({ msg: "The user belonging to this token does not exist" });
 
-        req.user = user;
+        req.user = decodedToken.id;
         next();
     } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error";

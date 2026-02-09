@@ -7,9 +7,24 @@ export const createProjectSchema = z
     isBillable: z.boolean().optional().default(false),
     hourlyRate: z.number().min(1, "Hourly rate must be at least 1").optional(),
   })
-  .refine((data) => !data.isBillable || typeof data.hourlyRate === "number", {
-    message: "Hourly rate is required when project is billable",
-    path: ["hourlyRate"],
+  .superRefine((data, ctx) => {
+    if (data.isBillable) {
+      if (typeof data.hourlyRate !== "number") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Hourly rate is required when project is billable",
+          path: ["hourlyRate"],
+        });
+      }
+    } else {
+      if (data.hourlyRate !== undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Hourly rate is not allowed when project is not billable",
+          path: ["hourlyRate"],
+        });
+      }
+    }
   });
 
 export const updateProjectSchema = z
@@ -19,9 +34,24 @@ export const updateProjectSchema = z
     isBillable: z.boolean().optional(),
     hourlyRate: z.number().min(1, "Hourly rate must be at least 1").optional(),
   })
-  .refine((data) => !data.isBillable || typeof data.hourlyRate === "number", {
-    message: "Hourly rate is required when project is billable",
-    path: ["hourlyRate"],
+  .superRefine((data, ctx) => {
+    if (data.isBillable === true) {
+      if (typeof data.hourlyRate !== "number") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Hourly rate is required when setting project as billable",
+          path: ["hourlyRate"],
+        });
+      }
+    } else if (data.isBillable === false) {
+      if (data.hourlyRate !== undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Hourly rate is not allowed when setting project as non-billable",
+          path: ["hourlyRate"],
+        });
+      }
+    }
   });
 
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;

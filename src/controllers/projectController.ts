@@ -5,7 +5,7 @@ import { UpdateQuery } from 'mongoose';
 
 export const getAllProjects = async (req: Request, res: Response) => {
   try {
-    const userId = req.user?._id;
+    const userId = req.user;
     if (!userId) return res.status(401).json({ msg: "Unauthorized" });
 
     const projects = await PROJECT.find({ userId, isActive: true });
@@ -36,7 +36,7 @@ export const getProjectById = async (req: Request, res: Response) => {
 
 export const createProject = async (req: Request, res: Response) => {
   try {
-    const userId = req.user?._id;
+    const userId = req.user;
     if (!userId) return res.status(401).json({ msg: "Unauthorized" });
     
     const { name, description, isBillable, hourlyRate } = req.body;
@@ -44,8 +44,8 @@ export const createProject = async (req: Request, res: Response) => {
     const project = await PROJECT.create({
       name,
       description,
-      isBillable,
-      hourlyRate,
+      isBillable:isBillable ?? false,
+      hourlyRate: isBillable === true ? hourlyRate : undefined,
       userId,
     });
 
@@ -63,7 +63,7 @@ export const updateProject = async (req: Request, res: Response) => {
       return res.status(400).json({ msg: "Invalid project id" });
     }
 
-    const userId = req.user?._id;
+    const userId = req.user;
     if (!userId) {
       return res.status(401).json({ msg: "Unauthorized" });
     }
