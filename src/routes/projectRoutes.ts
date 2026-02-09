@@ -15,9 +15,9 @@ const router = Router();
 router.use(protect);
 
 router.get("/", getAllProjects);
-router.get(":id", getProjectById);
+router.get("/:id", getProjectById);
 router.post("/", validateRequest(createProjectSchema), createProject);
-router.put("/:id", validateRequest(updateProjectSchema), updateProject);
+router.patch("/:id", validateRequest(updateProjectSchema), updateProject);
 router.delete("/:id", deleteProject);
 
 export default router;
