@@ -1,11 +1,12 @@
-import { IUser } from "../models/user";
+import { Types } from "mongoose";
 import jwt, { JwtPayload } from "jsonwebtoken";
 import { Request, Response, NextFunction } from "express";
 
 declare global {
   namespace Express {
     interface Request {
-      user?: IUser;
+      // user?: IUser;
+      user?: Types.ObjectId;
     }
   }
 }

@@ -21,7 +21,7 @@ export const getProjectById = async (req: Request, res: Response) => {
     const id = req.params.id as string;
     if (!Types.ObjectId.isValid(id)) return res.status(400).json({ msg: "Invalid project id" });
 
-    const userId = req.user?._id;
+    const userId = req.user;
     if (!userId) return res.status(401).json({ msg: "Unauthorized" });
 
     const project = await PROJECT.findOne({ _id: id, userId, isActive: true });
@@ -133,7 +133,7 @@ export const deleteProject = async (req: Request, res: Response) => {
     const id = req.params.id as string;
     if (!Types.ObjectId.isValid(id)) return res.status(400).json({ msg: "Invalid project id" });
 
-    const userId = req.user?._id;
+    const userId = req.user;
     if (!userId) return res.status(401).json({ msg: "Unauthorized" });
 
     const project = await PROJECT.findOne({ _id: id, userId, isActive: true });
