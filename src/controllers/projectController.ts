@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import PROJECT, { IProject } from "../models/project";
+import TimeEntry, {ITimeEntry} from "../models/timeEntry";
 import { Types } from "mongoose";
 import { UpdateQuery } from 'mongoose';
 
@@ -9,6 +10,7 @@ export const getAllProjects = async (req: Request, res: Response) => {
     if (!userId) return res.status(401).json({ msg: "Unauthorized" });
 
     const projects = await PROJECT.find({ userId, isActive: true });
+    if(projects.length < 1) return res.status(404).json({ msg: "No projects available." });
     return res.status(200).json({ msg: "Projects fetched successfully", data: projects });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";
@@ -25,7 +27,7 @@ export const getProjectById = async (req: Request, res: Response) => {
     if (!userId) return res.status(401).json({ msg: "Unauthorized" });
 
     const project = await PROJECT.findOne({ _id: id, userId, isActive: true });
-    if (!project) return res.status(404).json({ msg: "Project not found" });
+    if (!project) return res.status(404).json({ msg: "No projects available." });
 
     return res.status(200).json({ msg: "Project fetched successfully", data: project });
   } catch (error: unknown) {
@@ -142,7 +144,9 @@ export const deleteProject = async (req: Request, res: Response) => {
     project.isActive = false;
     await project.save();
 
-    return res.status(200).json({ msg: "Project deleted successfully" });
+    await TimeEntry.deleteMany({projectId: id});
+
+    return res.status(200).json({ msg: "Project and it's time entries deleted successfully" });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return res.status(500).json({ msg: "Server error", error: message });

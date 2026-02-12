@@ -33,7 +33,7 @@ const projectSchema = new Schema<IProject>(
     hourlyRate: {
       type: Number,
       min: [0, "Hourly rate must be at least 0"],
-      required: function (this: any) {
+      required: function (this) {
         return this.isBillable === true;
       },
     },

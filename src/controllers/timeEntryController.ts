@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import TimeEntry, { ITimeEntry } from "../models/timeEntry";
 import PROJECT from "../models/project";
 import { Types } from "mongoose";
+import { parseUserDateTime, formatToUserTimezone } from "../utils/dateTimeFormat";
 
 // Helper function to calculate overlap in minutes between two time ranges
 function calculateOverlapInMinutes(
@@ -62,13 +63,18 @@ export const createTimeEntry = async (req: Request, res: Response) => {
     const { projectId, startTime, endTime, description } = req.body;
 
     // Check if project exists and belongs to user
-    const project = await PROJECT.findOne({ _id: projectId, userId ,isActive: true });
+    const project = await PROJECT.findOne({ _id: projectId, userId, isActive: true });
     if (!project) {
       return res.status(404).json({ msg: "Project not found" });
     }
 
-    const startDate = new Date(startTime);
-    const endDate = new Date(endTime);
+    // Parse user's datetime format (IST) and convert to UTC
+    const startDate = parseUserDateTime(startTime);
+    const endDate = parseUserDateTime(endTime);
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({ msg: "Invalid date format" });
+    }
 
     // Check for overlapping entries
     const hasOverlap = await checkForOverlappingEntries(userId, startDate, endDate);
@@ -90,7 +96,16 @@ export const createTimeEntry = async (req: Request, res: Response) => {
       description,
     });
 
-    return res.status(201).json({ msg: "Time entry created successfully", data: timeEntry });
+    // Format dates to user's timezone for response
+    const responseData = {
+      ...timeEntry.toObject(),
+      startTime: formatToUserTimezone(timeEntry.startTime),
+      endTime: formatToUserTimezone(timeEntry.endTime),
+      createdAt: timeEntry.createdAt,
+      updatedAt: timeEntry.updatedAt,
+    };
+
+    return res.status(201).json({ msg: "Time entry created successfully", data: responseData });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return res.status(500).json({ msg: "Server error", error: message });
@@ -114,18 +129,30 @@ export const updateTimeEntry = async (req: Request, res: Response) => {
       return res.status(404).json({ msg: "Time entry not found" });
     }
 
-    const { projectId, startTime, endTime, description } = req.body;
+    const { startTime, endTime, description } = req.body;
 
-    // Check if project exists and belongs to user
-    if (projectId) {
-      const project = await PROJECT.findOne({ _id: projectId, userId, isActive: true });
-      if (!project) {
-        return res.status(404).json({ msg: "Project not found" });
-      }
+    // Parse user's datetime format (IST) and convert to UTC, or use existing values
+    const startDate = startTime ? parseUserDateTime(startTime) : existingEntry.startTime;
+    const endDate = endTime ? parseUserDateTime(endTime) : existingEntry.endTime;
+
+    if (!startDate) {
+      return res.status(400).json({ msg: "Invalid start time format" });
+    }
+    if (!endDate) {
+      return res.status(400).json({ msg: "Invalid end time format" });
     }
 
-    const startDate = startTime ? new Date(startTime) : existingEntry.startTime;
-    const endDate = endTime ? new Date(endTime) : existingEntry.endTime;
+    if (endDate <= startDate) {
+      return res.status(400).json({ msg: "End time must be after start time" });
+    }
+
+    const now = new Date();
+    const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000);
+    if (endDate > fiveMinutesFromNow) {
+      return res.status(400).json({
+        msg: "End time cannot be more than 5 minutes in the future",
+      });
+    }
 
     // Check for overlapping entries (excluding the current entry)
     const hasOverlap = await checkForOverlappingEntries(userId, startDate, endDate, id);
@@ -138,8 +165,7 @@ export const updateTimeEntry = async (req: Request, res: Response) => {
     // Calculate duration
     const duration = Math.floor((endDate.getTime() - startDate.getTime()) / 1000 / 60);
 
-    const updateData: any = {
-      projectId: projectId || existingEntry.projectId,
+    const updateData = {
       startTime: startDate,
       endTime: endDate,
       duration,
@@ -152,7 +178,16 @@ export const updateTimeEntry = async (req: Request, res: Response) => {
       { new: true, runValidators: true }
     );
 
-    return res.status(200).json({ msg: "Time entry updated successfully", data: updatedEntry });
+    // Format dates to user's timezone for response
+    const responseData = {
+      ...updatedEntry!.toObject(),
+      startTime: formatToUserTimezone(updatedEntry!.startTime),
+      endTime: formatToUserTimezone(updatedEntry!.endTime),
+      createdAt: updatedEntry!.createdAt,
+      updatedAt: updatedEntry!.updatedAt,
+    };
+
+    return res.status(200).json({ msg: "Time entry updated successfully", data: responseData });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return res.status(500).json({ msg: "Server error", error: message });
@@ -198,7 +233,7 @@ export const getTimeEntriesByProject = async (req: Request, res: Response) => {
     }
 
     // Verify project belongs to user
-    const project = await PROJECT.findOne({ _id: projectId, userId });
+    const project = await PROJECT.findOne({ _id: projectId, userId, isActive: true });
     if (!project) {
       return res.status(404).json({ msg: "Project not found" });
     }
@@ -206,9 +241,18 @@ export const getTimeEntriesByProject = async (req: Request, res: Response) => {
     const timeEntries = await TimeEntry.find({ projectId, userId })
       .sort({ startTime: -1 });
 
+    // Format dates to user's timezone for response
+    const formattedEntries = timeEntries.map((entry) => ({
+      ...entry.toObject(),
+      startTime: formatToUserTimezone(entry.startTime),
+      endTime: formatToUserTimezone(entry.endTime),
+      createdAt: entry.createdAt,
+      updatedAt: entry.updatedAt,
+    }));
+
     return res.status(200).json({
       msg: "Time entries fetched successfully",
-      data: timeEntries,
+      data: formattedEntries,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";
@@ -233,7 +277,16 @@ export const getTimeEntryById = async (req: Request, res: Response) => {
       return res.status(404).json({ msg: "Time entry not found" });
     }
 
-    return res.status(200).json({ msg: "Time entry fetched successfully", data: timeEntry });
+    // Format dates to user's timezone for response
+    const responseData = {
+      ...timeEntry.toObject(),
+      startTime: formatToUserTimezone(timeEntry.startTime),
+      endTime: formatToUserTimezone(timeEntry.endTime),
+      createdAt: timeEntry.createdAt,
+      updatedAt: timeEntry.updatedAt,
+    };
+
+    return res.status(200).json({ msg: "Time entry fetched successfully", data: responseData });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return res.status(500).json({ msg: "Server error", error: message });
