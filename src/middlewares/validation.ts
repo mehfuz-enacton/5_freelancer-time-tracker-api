@@ -1,14 +1,21 @@
 import { Request, Response, NextFunction } from "express";
 import { ZodSchema, ZodError, ZodIssue } from "zod";
 
-export const validateRequest = (schema: ZodSchema) => {
+type ValidationSource = "body" | "query" | "params";
+
+export const validate = (schema: ZodSchema, source: ValidationSource = "body") => {
   return (req: Request, res: Response, next: NextFunction) => {
     try {
-      const validatedData = schema.parse(req.body);
-      req.body = validatedData;
+      const dataToValidate = req[source];
+      const validatedData = schema.parse(dataToValidate);
+      
+      // Only reassign if it's body (query and params are read-only)
+      if (source === "body") {
+        req.body = validatedData;
+      }
+      
       next();
     } catch (error: unknown) {
-
       if (error instanceof ZodError) {
         const errorMessages = error.issues.map((issue: ZodIssue) => ({
           field: issue.path.length > 0 ? issue.path.join(".") : "unknown",
@@ -32,3 +39,8 @@ export const validateRequest = (schema: ZodSchema) => {
     }
   };
 };
+
+// Convenience wrappers for better readability
+export const validateBody = (schema: ZodSchema) => validate(schema, "body");
+export const validateQuery = (schema: ZodSchema) => validate(schema, "query");
+export const validateParams = (schema: ZodSchema) => validate(schema, "params");

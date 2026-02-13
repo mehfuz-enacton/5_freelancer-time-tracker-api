@@ -28,9 +28,8 @@ export const signUp = async (req: Request, res: Response) => {
     });
 
     return res.status(201).json({
-      msg: "User registered successfully",
+      msg: "User registered successfully, Please login for access",
       data: newUser,
-      token: generateToken(newUser._id.toString()),
     });
   } catch (error: any) {
     return res.status(500).json({ msg: "Server error", error: error.message });

@@ -32,8 +32,6 @@ export const createTimeEntrySchema = z
     const startDate = parseUserDateTime(data.startTime);
     const endDate = parseUserDateTime(data.endTime);
 
-    console.log("parsed Date (UTC):", startDate, endDate);
-
     if (!startDate || !endDate) {
       return;
     }

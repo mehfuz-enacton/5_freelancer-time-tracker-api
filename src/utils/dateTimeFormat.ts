@@ -1,5 +1,6 @@
 // Helper function to validate date format: DD-MM-YYYY HH:MM AM/PM
 export const dateTimeFormatRegex = /^(\d{2})-(\d{2})-(\d{4})\s+(\d{1,2}):(\d{2})\s+(AM|PM)$/i;
+export const dateRangeFormatRegex = /^(\d{2})-(\d{2})-(\d{4})$/;
 
 // Helper function to parse user's datetime format to UTC Date
 // Input: "10-02-2026 1:19 PM" (IST timezone assumed)
@@ -36,7 +37,6 @@ export function parseUserDateTime(dateString: string): Date | null {
 // Input: Date object in UTC
 // Output: "10-02-2026 1:19 PM" (in IST timezone)
 export function formatToUserTimezone(utcDate: Date): string {
-  console.log("UTC Date:", utcDate);
   const istOffsetMs = (5 * 60 + 30) * 60 * 1000;
   const istTimestamp = utcDate.getTime() + istOffsetMs;
   const istDate = new Date(istTimestamp);
@@ -53,4 +53,26 @@ export function formatToUserTimezone(utcDate: Date): string {
   hours = hours ? hours : 12;
 
   return `${day}-${month}-${year} ${hours}:${minutes} ${period}`;
+}
+
+// Helper function to parse date string DD-MM-YYYY to UTC Date objects
+export function parseDateRange(dateStr: string): { start: Date; end: Date } | null {
+  const match = dateStr.match(dateRangeFormatRegex);
+  if (!match) return null;
+
+  const [, day, month, year] = match;
+
+   if (!day || !month || !year) {
+    return null;
+  }
+  const d = parseInt(day, 10);
+  const m = parseInt(month, 10) - 1;
+  const y = parseInt(year, 10);
+  
+  // Create start of day (00:00:00 IST) → convert to UTC
+  const istOffsetMs = (5 * 60 + 30) * 60 * 1000;
+  const startUTC = new Date(Date.UTC(y, m, d, 0, 0, 0) - istOffsetMs);
+  const endUTC = new Date(Date.UTC(y, m, d, 23, 59, 59) - istOffsetMs);
+  
+  return { start: startUTC, end: endUTC };
 }
