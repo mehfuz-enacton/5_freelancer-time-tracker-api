@@ -37,11 +37,6 @@ export const getProjectsSummary = async (req: Request, res: Response) => {
       filterApplied.to = to as string;
     }
 
-    // Get all active projects for user
-    const projects = await Project.find({ userId, isActive: true });
-    if (projects.length < 1)
-      return res.status(404).json({ msg: "No projects available" });
-
     // Build time entry filter
     const timeEntryFilter: any = { userId };
     if (fromDate || toDate) {
@@ -52,6 +47,27 @@ export const getProjectsSummary = async (req: Request, res: Response) => {
 
     // Get time entries within date range
     const timeEntries = await TimeEntry.find(timeEntryFilter);
+
+    // Get unique project IDs that have work in this range
+    const projectIdsWithWork = [
+      ...new Set(timeEntries.map((entry) => entry.projectId.toString())),
+    ];
+
+    // Get only projects that have work in the date range
+    const projects = await Project.find({
+      _id: { $in: projectIdsWithWork },
+      userId,
+      isActive: true,
+    });
+    if (projects.length < 1) {
+      return res.status(200).json({
+        success: true,
+        filterApplied:
+          Object.keys(filterApplied).length > 0 ? filterApplied : null,
+        msg: "No projects with activity in the selected date range",
+        data: [],
+      });
+    }
 
     // Aggregate data by project
     const projectsData = projects.map((project) => {
@@ -73,7 +89,8 @@ export const getProjectsSummary = async (req: Request, res: Response) => {
           ? Math.round(totalWorkingHours * project.hourlyRate * 100) / 100
           : 0;
 
-    const projectCreatedOn = formatToUserTimezone(project.createdAt);
+      const projectCreatedOn = formatToUserTimezone(project.createdAt);
+
       // Find earliest startTime and latest endTime
       let projectStartedOn = "";
       let projectLastWorkOn = "";
@@ -86,10 +103,9 @@ export const getProjectsSummary = async (req: Request, res: Response) => {
         const firstEntry = sortedEntries[0];
         const lastEntry = sortedEntries[sortedEntries.length - 1];
 
-        if(firstEntry && lastEntry){
-
-            projectStartedOn = formatToUserTimezone(firstEntry.startTime);
-            projectLastWorkOn = formatToUserTimezone(lastEntry.endTime);
+        if (firstEntry && lastEntry) {
+          projectStartedOn = formatToUserTimezone(firstEntry.startTime);
+          projectLastWorkOn = formatToUserTimezone(lastEntry.endTime);
         }
       } else {
         // If no time entries in range, show project creation date
@@ -156,9 +172,6 @@ export const getSummaryOverview = async (req: Request, res: Response) => {
       filterApplied.to = to as string;
     }
 
-    // Get all active projects for user
-    const projects = await Project.find({ userId, isActive: true });
-
     // Build time entry filter
     const timeEntryFilter: any = { userId };
     if (fromDate || toDate) {
@@ -169,6 +182,16 @@ export const getSummaryOverview = async (req: Request, res: Response) => {
 
     // Get time entries within date range
     const timeEntries = await TimeEntry.find(timeEntryFilter);
+
+    const projectIdsWithWork = [
+      ...new Set(timeEntries.map((entry) => entry.projectId.toString())),
+    ];
+
+    const projects = await Project.find({
+      _id: { $in: projectIdsWithWork },
+      userId,
+      isActive: true,
+    });
 
     // Calculate overview metrics
     let totalWorkingHours = 0;
